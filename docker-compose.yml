@@ -1,0 +1,36 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: math_bot_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: math_bot
+      POSTGRES_USER: enfdb
+      POSTGRES_PASSWORD: enfdb
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql:ro
+      - ./db/seed_teachers.sql:/docker-entrypoint-initdb.d/02_seed.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U enfdb -d math_bot"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  bot:
+    build: .
+    container_name: math_bot_app
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://enfdb:enfdb@db:5432/math_bot
+    command: ["python", "run_bot.py"]
+
+volumes:
+  postgres_data:
